@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { generateGeminiResponse } from './services/geminiService';
 import { MemoryStore } from './services/memoryStore';
 import { Message, IntelligenceMode, ProcessingState } from './types';
@@ -7,6 +8,11 @@ import { MemoryManager } from './components/MemoryManager';
 import { TrainModal } from './components/TrainModal';
 
 export default function App() {
+  // Routing Hooks
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isMemoryOpen = location.pathname === '/memory';
+
   // State
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -15,7 +21,6 @@ export default function App() {
   const [memoryCount, setMemoryCount] = useState(0);
   
   // Modals
-  const [showMemory, setShowMemory] = useState(false);
   const [trainData, setTrainData] = useState<{ show: boolean, trigger: string }>({ show: false, trigger: '' });
 
   // Refs
@@ -35,9 +40,10 @@ export default function App() {
     scrollToBottom();
   }, [messages, processing]);
 
+  // Refresh memory count on mount and when route changes (e.g. closing memory manager)
   useEffect(() => {
     refreshMemoryCount();
-  }, []);
+  }, [location.pathname]);
 
   // Handlers
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -133,7 +139,7 @@ export default function App() {
         
         <div className="flex items-center gap-4">
            <button 
-             onClick={() => setShowMemory(true)}
+             onClick={() => navigate('/memory')}
              title="Manage trained commands and memory"
              className="relative text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-2 text-sm font-medium group"
            >
@@ -297,11 +303,10 @@ export default function App() {
       </footer>
 
       {/* Overlays */}
-      {showMemory && (
+      {isMemoryOpen && (
         <MemoryManager 
           onClose={() => {
-            setShowMemory(false);
-            refreshMemoryCount();
+            navigate('/');
           }} 
         />
       )}

@@ -1,4 +1,4 @@
-import { GoogleGenAI, Tool } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { IntelligenceMode, GroundingSource } from '../types';
 
 interface GenerationResult {
@@ -30,13 +30,11 @@ export const generateGeminiResponse = async (
   mode: IntelligenceMode,
   history: { role: string; content: string }[] = []
 ): Promise<GenerationResult> => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key required");
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Initialize GoogleGenAI with the API key directly from process.env as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Configure tools based on mode. Hallucin might not need search, but others do.
-  const tools: Tool[] = [];
+  const tools = [];
   
   // We enable search for all modes except maybe Hallucin if we want pure creativity, 
   // but even Hallucin works better with some context. Let's keep it generally available
