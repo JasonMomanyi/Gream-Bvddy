@@ -71,6 +71,7 @@ export const TrainModal: React.FC<Props> = ({ initialTrigger, onClose, onSuccess
             <button
               type="button"
               onClick={onClose}
+              title="Cancel training"
               className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
             >
               Cancel
@@ -78,6 +79,7 @@ export const TrainModal: React.FC<Props> = ({ initialTrigger, onClose, onSuccess
             <button
               type="submit"
               disabled={!trigger || !response}
+              title="Save custom command"
               className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save to Memory

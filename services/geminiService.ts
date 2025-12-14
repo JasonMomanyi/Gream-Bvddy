@@ -54,8 +54,10 @@ export const generateGeminiResponse = async (
   if (mode === IntelligenceMode.HALLUCIN) temperature = 1.2; // High creativity
 
   try {
-    const modelId = mode === IntelligenceMode.HALLUCIN || mode === IntelligenceMode.DETAILED 
-      ? 'gemini-2.5-flash' // Using flash for speed, could upgrade to pro for reasoning
+    // Use gemini-3-pro-preview for complex tasks (Detailed) and creative tasks (Hallucin)
+    // Use gemini-2.5-flash for basic text tasks (Summary, Explanation, Popular)
+    const modelId = (mode === IntelligenceMode.DETAILED || mode === IntelligenceMode.HALLUCIN)
+      ? 'gemini-3-pro-preview'
       : 'gemini-2.5-flash';
 
     const response = await ai.models.generateContent({

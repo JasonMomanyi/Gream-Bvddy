@@ -12,6 +12,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState<IntelligenceMode>(IntelligenceMode.SUMMARY);
   const [processing, setProcessing] = useState<ProcessingState>('idle');
+  const [memoryCount, setMemoryCount] = useState(0);
   
   // Modals
   const [showMemory, setShowMemory] = useState(false);
@@ -26,9 +27,17 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
+  const refreshMemoryCount = () => {
+    setMemoryCount(MemoryStore.load().length);
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, processing]);
+
+  useEffect(() => {
+    refreshMemoryCount();
+  }, []);
 
   // Handlers
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -96,10 +105,11 @@ export default function App() {
   };
 
   // Renderers
-  const renderModeButton = (m: IntelligenceMode, label: string, colorClass: string) => (
+  const renderModeButton = (m: IntelligenceMode, label: string, colorClass: string, tooltip: string) => (
     <button
       type="button"
       onClick={() => setMode(m)}
+      title={tooltip}
       className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
         mode === m 
           ? `${colorClass} text-white border-transparent shadow-lg transform scale-105` 
@@ -115,7 +125,7 @@ export default function App() {
       
       {/* Header */}
       <header className="flex-none h-16 border-b border-white/10 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" title="Gream Bvddy - Personal AI Research Assistant">
           {/* Main App Icon: Happy Green Skull with Gemini Star */}
           <IconGreamSkull className="text-green-400 w-8 h-8" />
           <h1 className="text-lg font-bold tracking-tight text-white">Gream Bvddy <span className="text-xs font-normal text-slate-400 ml-2 border border-slate-700 px-2 py-0.5 rounded">v1.0</span></h1>
@@ -124,10 +134,24 @@ export default function App() {
         <div className="flex items-center gap-4">
            <button 
              onClick={() => setShowMemory(true)}
-             className="text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-2 text-sm font-medium"
+             title="Manage trained commands and memory"
+             className="relative text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-2 text-sm font-medium group"
            >
-             <IconDatabase className="w-4 h-4" />
+             <div className="relative">
+               <IconDatabase className="w-4 h-4" />
+               {memoryCount > 0 && (
+                 <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
+                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                   <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                 </span>
+               )}
+             </div>
              Memory
+             {memoryCount > 0 && (
+               <span className="bg-slate-800 text-slate-200 text-[10px] px-1.5 py-0.5 rounded-md border border-slate-700 group-hover:border-cyan-500/50 transition-colors">
+                 {memoryCount}
+               </span>
+             )}
            </button>
         </div>
       </header>
@@ -180,6 +204,7 @@ export default function App() {
                           href={source.uri} 
                           target="_blank" 
                           rel="noopener noreferrer"
+                          title={`Open source: ${source.title}`}
                           className="text-xs bg-slate-900 hover:bg-cyan-900/30 text-cyan-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/50 px-2 py-1 rounded transition-colors truncate max-w-[200px]"
                         >
                           {source.title}
@@ -223,11 +248,11 @@ export default function App() {
           
           {/* Mode Selector */}
           <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-            {renderModeButton(IntelligenceMode.SUMMARY, 'Summary', 'bg-emerald-600')}
-            {renderModeButton(IntelligenceMode.EXPLANATION, 'Explain', 'bg-blue-600')}
-            {renderModeButton(IntelligenceMode.DETAILED, 'Detailed', 'bg-indigo-600')}
-            {renderModeButton(IntelligenceMode.POPULAR, 'Popular', 'bg-orange-600')}
-            {renderModeButton(IntelligenceMode.HALLUCIN, 'Hallucin / Imagine', 'bg-purple-600')}
+            {renderModeButton(IntelligenceMode.SUMMARY, 'Summary', 'bg-emerald-600', 'Concise overview with bullet points')}
+            {renderModeButton(IntelligenceMode.EXPLANATION, 'Explain', 'bg-blue-600', 'Simple analogies for beginners')}
+            {renderModeButton(IntelligenceMode.DETAILED, 'Detailed', 'bg-indigo-600', 'Deep technical breakdowns and steps')}
+            {renderModeButton(IntelligenceMode.POPULAR, 'Popular', 'bg-orange-600', 'Trending opinions and general consensus')}
+            {renderModeButton(IntelligenceMode.HALLUCIN, 'Hallucin / Imagine', 'bg-purple-600', 'Creative and speculative generation')}
           </div>
 
           {/* Input Box */}
@@ -248,6 +273,7 @@ export default function App() {
               <button
                 type="submit"
                 disabled={!input.trim() || processing !== 'idle'}
+                title="Send message"
                 className="p-3 mr-2 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
               >
                 <IconSend />
@@ -255,21 +281,36 @@ export default function App() {
             </div>
           </form>
           
-          <div className="text-center text-[10px] text-slate-600 font-mono">
-            {mode === IntelligenceMode.HALLUCIN 
-              ? "WARNING: Speculative Mode Active. Output may contain generated fiction." 
-              : "Standard Intelligence Active. Grounded in search where applicable."}
+          <div className="flex flex-col items-center gap-2 text-[10px] font-mono text-slate-600">
+             <span>
+              {mode === IntelligenceMode.HALLUCIN 
+                ? "WARNING: Speculative Mode Active. Output may contain generated fiction." 
+                : "Standard Intelligence Active. Grounded in search where applicable."}
+            </span>
+            <div className="flex gap-4 opacity-60 hover:opacity-100 transition-opacity">
+              <a href="https://jasonmomanyi.netlify.app" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400" title="Visit Developer Website">Dev: Jason Momanyi</a>
+              <a href="https://discord.com/users/1092210946547654730" target="_blank" rel="noopener noreferrer" className="hover:text-indigo-400" title="Contact on Discord">Discord</a>
+              <a href="https://instagram.com/lord_stunnis" target="_blank" rel="noopener noreferrer" className="hover:text-pink-400" title="Visit Instagram">@lord_stunnis</a>
+            </div>
           </div>
         </div>
       </footer>
 
       {/* Overlays */}
-      {showMemory && <MemoryManager onClose={() => setShowMemory(false)} />}
+      {showMemory && (
+        <MemoryManager 
+          onClose={() => {
+            setShowMemory(false);
+            refreshMemoryCount();
+          }} 
+        />
+      )}
       {trainData.show && (
         <TrainModal 
           initialTrigger={trainData.trigger} 
           onClose={() => setTrainData({ show: false, trigger: '' })}
           onSuccess={(trigger) => {
+             refreshMemoryCount();
              // Optional: Add a system message confirming learning
              setMessages(prev => [...prev, {
                id: crypto.randomUUID(),

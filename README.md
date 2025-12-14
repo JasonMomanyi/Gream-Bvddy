@@ -20,6 +20,7 @@
   - [Netlify](#2-netlify-free)
   - [Replit](#3-replit-free-tier)
   - [Heroku](#4-heroku-paid)
+- [Contact Developer](#-contact-developer)
 - [Security Note](#-security-note)
 
 ---
@@ -201,6 +202,16 @@ Heroku is traditionally for backend apps, but can host static sites with configu
     ```bash
     git push heroku main
     ```
+
+---
+
+## 📞 Contact Developer
+
+Created by **Jason Momanyi**.
+
+- 🌐 **Website:** [jasonmomanyi.netlify.app](https://jasonmomanyi.netlify.app)
+- 💬 **Discord:** [User Profile](https://discord.com/users/1092210946547654730)
+- 📸 **Instagram:** [@lord_stunnis](https://instagram.com/lord_stunnis)
 
 ---
 
