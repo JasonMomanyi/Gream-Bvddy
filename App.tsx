@@ -97,6 +97,39 @@ export default function App() {
     }
   };
 
+  // Helper to parse ugly JSON errors
+  const parseErrorMessage = (error: any): string => {
+    let msg = error instanceof Error ? error.message : String(error);
+    
+    // Check for JSON string
+    if (msg.includes('{"error":')) {
+      try {
+        const jsonStart = msg.indexOf('{');
+        const jsonStr = msg.slice(jsonStart);
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.error && parsed.error.message) {
+          msg = parsed.error.message;
+        }
+      } catch (e) {
+        // Parsing failed, stick to original string but truncate
+        if (msg.length > 300) msg = msg.substring(0, 300) + "...";
+      }
+    }
+
+    // User friendly mapping
+    if (msg.includes('429') || msg.includes('Quota exceeded') || msg.includes('RESOURCE_EXHAUSTED')) {
+      return "⚠️ **Capacity Overload:** The AI model is currently receiving too many requests. Please wait a minute before trying again.";
+    }
+    if (msg.includes('API Key is missing')) {
+      return "⚠️ **Configuration Error:** API Key is missing. Please check your Vercel settings.";
+    }
+    if (msg.includes('503')) {
+      return "⚠️ **Service Busy:** The AI servers are overloaded. Please try again in a few moments.";
+    }
+    
+    return `⚠️ **System Error:** ${msg}`;
+  };
+
   // Handlers
   const handleSendMessage = async (e?: React.FormEvent, suggestion?: string) => {
     if (e) e.preventDefault();
@@ -154,13 +187,12 @@ export default function App() {
       }]);
     } catch (error: any) {
       console.error(error);
-      // Display the actual error message from the service
-      const errorMessage = error instanceof Error ? error.message : "Unknown connection error.";
+      const friendlyMsg = parseErrorMessage(error);
       
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'model',
-        content: `⚠️ **System Error**\n\n${errorMessage}\n\n*If on Vercel: Ensure API_KEY is set in Environment Variables and you have Redeployed.*`,
+        content: friendlyMsg,
         timestamp: Date.now()
       }]);
     } finally {

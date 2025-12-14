@@ -7,7 +7,6 @@ interface GenerationResult {
 }
 
 // --- HELPER: Validate API Key ---
-// This ensures we catch Vercel deployment issues where the key might be undefined.
 const getClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === "undefined") {
@@ -71,12 +70,11 @@ const getPersonaInstruction = (persona: AIPersona): string => {
 
     case 'default':
     default:
-      return ""; // Default persona uses the base prompt
+      return "";
   }
 };
 
 const getSystemInstruction = (mode: IntelligenceMode, persona: AIPersona): string => {
-  // GREAM BVDDY — ONE-PAGE MASTER INSTRUCTIONS
   const masterIdentity = `
     IDENTITY & ORIGIN:
     You are Gream Bvddy, a professional, user-trainable AI research assistant designed for technical learning, system thinking, and exploratory reasoning.
@@ -97,9 +95,7 @@ const getSystemInstruction = (mode: IntelligenceMode, persona: AIPersona): strin
 
   const personaInstruction = getPersonaInstruction(persona);
 
-  // Append Mode-Specific Instructions (The "Auto Prompt Router" Logic)
   let modeInstruction = "";
-
   switch (mode) {
     case IntelligenceMode.SUMMARY:
       modeInstruction = `\nCURRENT MODE: SUMMARY\nINTENT: "What is", "Overview", "Brief"\nINSTRUCTION: Provide concise, high-level overviews. Use bullet points. Maximum brevity. Focus on key facts only.`;
@@ -134,10 +130,7 @@ export const generateGeminiResponse = async (
   persona: AIPersona = 'default'
 ): Promise<GenerationResult> => {
   
-  // Use helper to validate key before making request
   const ai = getClient();
-  
-  // Configure tools based on mode. Hallucin might not need search, but others do.
   const tools = [];
   
   if (mode !== IntelligenceMode.HALLUCIN) {
@@ -146,26 +139,21 @@ export const generateGeminiResponse = async (
 
   const systemInstruction = getSystemInstruction(mode, persona);
 
-  // Adjust creativity based on mode and persona
   let temperature = 0.7;
-  
-  // Mode Overrides
   if (mode === IntelligenceMode.SUMMARY) temperature = 0.3;
   if (mode === IntelligenceMode.DETAILED) temperature = 0.4;
   if (mode === IntelligenceMode.HALLUCIN) temperature = 1.2;
-  
-  // Persona Overrides (Persona takes slight precedence for creativity)
   if (persona === 'fun' || persona === 'pirate' || persona === 'shakespeare') temperature = 1.0;
   if (persona === 'robot' || persona === 'professional') temperature = 0.2;
 
-  try {
-    // Use gemini-3-pro-preview for complex tasks (Detailed, Scrape Planner, Hacker) and creative tasks
-    // Use gemini-2.5-flash for basic text tasks (Summary, Explanation, Popular)
-    const modelId = (mode === IntelligenceMode.DETAILED || mode === IntelligenceMode.HALLUCIN || mode === IntelligenceMode.SCRAPE_PLANNER || mode === IntelligenceMode.HACKER)
-      ? 'gemini-3-pro-preview'
-      : 'gemini-2.5-flash';
+  // Primary Model Selection
+  // Use Pro for complex tasks, Flash for speed/simpler tasks
+  const primaryModel = (mode === IntelligenceMode.DETAILED || mode === IntelligenceMode.HALLUCIN || mode === IntelligenceMode.SCRAPE_PLANNER || mode === IntelligenceMode.HACKER)
+    ? 'gemini-3-pro-preview'
+    : 'gemini-2.5-flash';
 
-    const response = await ai.models.generateContent({
+  const generate = async (modelId: string) => {
+    return await ai.models.generateContent({
       model: modelId,
       contents: [
         ...history.map(h => ({
@@ -180,57 +168,66 @@ export const generateGeminiResponse = async (
         tools: tools.length > 0 ? tools : undefined,
       }
     });
+  };
 
-    const text = response.text || "No response generated.";
-    
-    // Extract grounding metadata
-    let sources: GroundingSource[] = [];
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    
-    if (groundingChunks) {
-      sources = groundingChunks
-        .filter((c: any) => c.web?.uri && c.web?.title)
-        .map((c: any) => ({
-          title: c.web.title,
-          uri: c.web.uri
-        }));
+  try {
+    const response = await generate(primaryModel);
+    return processResponse(response);
+  } catch (error: any) {
+    console.warn(`Primary model ${primaryModel} failed. Checking for fallback...`, error);
+
+    // Check for Rate Limit (429) or Service Unavailable (503)
+    const errorMsg = error.message || JSON.stringify(error);
+    const isRateLimit = errorMsg.includes('429') || errorMsg.includes('Quota exceeded') || errorMsg.includes('RESOURCE_EXHAUSTED');
+    const isOverloaded = errorMsg.includes('503') || errorMsg.includes('Overloaded');
+
+    if ((isRateLimit || isOverloaded) && primaryModel !== 'gemini-2.5-flash') {
+      console.log("Falling back to gemini-2.5-flash due to rate limits...");
+      try {
+        // Fallback to Flash (Lighter, higher limits)
+        const fallbackResponse = await generate('gemini-2.5-flash');
+        
+        // Append a note about the fallback
+        const result = processResponse(fallbackResponse);
+        result.text += "\n\n_(Note: High-reasoning model capacity exceeded. Response generated using Turbo mode.)_";
+        return result;
+      } catch (fallbackError) {
+        console.error("Fallback model also failed:", fallbackError);
+        throw fallbackError; // Throw original or new error
+      }
     }
 
-    return { text, sources };
-
-  } catch (error) {
-    console.error("Gemini API Error:", error);
     throw error;
   }
 };
 
-/**
- * Generates an image based on the prompt using Gemini Nano Banana (gemini-2.5-flash-image)
- */
+// Helper to extract text and sources
+function processResponse(response: any): GenerationResult {
+  const text = response.text || "No response generated.";
+  let sources: GroundingSource[] = [];
+  const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  
+  if (groundingChunks) {
+    sources = groundingChunks
+      .filter((c: any) => c.web?.uri && c.web?.title)
+      .map((c: any) => ({
+        title: c.web.title,
+        uri: c.web.uri
+      }));
+  }
+  return { text, sources };
+}
+
 export const generateImage = async (prompt: string): Promise<string> => {
   const ai = getClient();
-  
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [
-          { text: prompt },
-        ],
-      },
-      config: {
-        // Nano Banana models do not support responseMimeType or tools
-        imageConfig: {
-          aspectRatio: "1:1" // Default square
-        }
-      },
+      contents: { parts: [{ text: prompt }] },
+      config: { imageConfig: { aspectRatio: "1:1" } },
     });
-
-    // Iterate through parts to find the image
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
+      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
     throw new Error("No image data returned from model.");
   } catch (error) {
@@ -239,13 +236,8 @@ export const generateImage = async (prompt: string): Promise<string> => {
   }
 };
 
-/**
- * Generates speech (TTS) using Gemini (gemini-2.5-flash-preview-tts)
- * Proxies for "11Labs" style high-quality generation.
- */
 export const generateSpeech = async (text: string, voiceName: string = 'Kore'): Promise<string> => {
   const ai = getClient();
-  
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -253,17 +245,12 @@ export const generateSpeech = async (text: string, voiceName: string = 'Kore'): 
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voiceName },
-          },
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
         },
       },
     });
-
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) {
-      throw new Error("No audio data returned.");
-    }
+    if (!base64Audio) throw new Error("No audio data returned.");
     return base64Audio;
   } catch (error) {
     console.error("Gemini TTS Error:", error);
