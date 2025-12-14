@@ -8,7 +8,6 @@ import { TrainModal } from './components/TrainModal';
 
 export default function App() {
   // State
-  const [apiKey, setApiKey] = useState<string>(process.env.API_KEY || '');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState<IntelligenceMode>(IntelligenceMode.SUMMARY);
@@ -34,7 +33,7 @@ export default function App() {
   // Handlers
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!input.trim() || !apiKey) return;
+    if (!input.trim()) return;
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -73,7 +72,7 @@ export default function App() {
         setProcessing('searching');
       }
 
-      const result = await generateGeminiResponse(apiKey, currentInput, mode, history);
+      const result = await generateGeminiResponse(currentInput, mode, history);
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
@@ -123,16 +122,6 @@ export default function App() {
         </div>
         
         <div className="flex items-center gap-4">
-           {/* API Key Input (Hidden if set, ideally) - For Demo purposes kept simple */}
-           {!process.env.API_KEY && (
-            <input 
-              type="password" 
-              placeholder="Enter Gemini API Key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 w-40"
-            />
-           )}
            <button 
              onClick={() => setShowMemory(true)}
              className="text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-2 text-sm font-medium"

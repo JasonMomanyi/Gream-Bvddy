@@ -26,11 +26,11 @@ const getSystemInstruction = (mode: IntelligenceMode): string => {
 };
 
 export const generateGeminiResponse = async (
-  apiKey: string,
   prompt: string,
   mode: IntelligenceMode,
   history: { role: string; content: string }[] = []
 ): Promise<GenerationResult> => {
+  const apiKey = process.env.API_KEY;
   if (!apiKey) throw new Error("API Key required");
 
   const ai = new GoogleGenAI({ apiKey });
