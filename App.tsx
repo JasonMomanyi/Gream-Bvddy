@@ -27,7 +27,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState<IntelligenceMode>(IntelligenceMode.SCRAPE_PLANNER);
   const [persona, setPersona] = useState<AIPersona>('default');
-  const [currentModelId, setCurrentModelId] = useState<string>('gemini-1.5-flash');
+  const [currentModelId, setCurrentModelId] = useState<string>('gemini-2.5-flash');
   const [processing, setProcessing] = useState<ProcessingState>('idle');
   const [memoryCount, setMemoryCount] = useState(0);
   const [showMediaHub, setShowMediaHub] = useState(false);
@@ -64,7 +64,7 @@ export default function App() {
 
   // Get current model info
   const activeModel = AVAILABLE_MODELS.find(m => m.id === currentModelId) || AVAILABLE_MODELS[0];
-  const isBaseAI = activeModel.id === 'gemini-1.5-flash';
+  const isBaseAI = activeModel.id === 'gemini-2.5-flash';
 
   // Suggestions based on Mode
   const getSuggestions = (currentMode: IntelligenceMode) => {
@@ -529,7 +529,7 @@ export default function App() {
           {/* UPDATED: Mobile Footer with Icon-Only Links */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-mono text-slate-600 w-full px-2 md:px-0">
              <div className="text-center md:text-left order-2 md:order-1 w-full md:w-auto">
-                 {activeModel.id === 'gemini-1.5-flash' 
+                 {activeModel.id === 'gemini-2.5-flash' 
                    ? 'Powered by Gemini Model: GreamBvd(Base)'
                    : activeModel.provider === 'puter'
                      ? `Powered by Puter.js • Model: ${activeModel.name}`

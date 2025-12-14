@@ -35,23 +35,23 @@ export interface ModelConfig {
 // Available Models based on Puter.js + Gemini
 export const AVAILABLE_MODELS: ModelConfig[] = [
   // Google
-  { id: 'gemini-1.5-flash', name: 'Base AI', provider: 'google', description: 'Standard Engine (Gemini 1.5 Flash)', isFree: true },
+  { id: 'gemini-2.5-flash', name: 'Base AI (Gemini 2.5)', provider: 'google', description: 'Standard Engine (Fast & Free)', isFree: true },
   { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro', provider: 'google', description: 'Advanced reasoning (High Quota Usage)', isFree: true },
   
   // Claude (via Puter)
-  { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'puter', description: 'Balanced intelligence & speed (Anthropic)', isFree: true },
-  { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'puter', description: 'Maximum reasoning power (Anthropic)', isFree: true },
+  { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'puter', description: 'Balanced intelligence & speed (Anthropic)', isFree: true },
+  { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'puter', description: 'Maximum reasoning power (Anthropic)', isFree: true },
   
   // OpenAI (via Puter)
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'puter', description: 'Versatile flagship model (OpenAI)', isFree: true },
-  { id: 'gpt-5-nano', name: 'GPT-5 Nano', provider: 'puter', description: 'Experimental fast model', isFree: true },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'puter', description: 'Fast & efficient', isFree: true },
   
   // DeepSeek (via Puter)
-  { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek v3.2', provider: 'puter', description: 'Strong open-source logic', isFree: true },
-  { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', provider: 'puter', description: 'Reasoning optimized', isFree: true },
+  { id: 'deepseek-chat', name: 'DeepSeek V3', provider: 'puter', description: 'Strong open-source logic', isFree: true },
+  { id: 'deepseek-reasoner', name: 'DeepSeek R1', provider: 'puter', description: 'Reasoning optimized', isFree: true },
 
   // Grok (via Puter)
-  { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1', provider: 'puter', description: 'Witty, real-time knowledge (xAI)', isFree: true },
+  { id: 'grok-beta', name: 'Grok Beta', provider: 'puter', description: 'Real-time knowledge (xAI)', isFree: true },
 ];
 
 export interface GroundingSource {

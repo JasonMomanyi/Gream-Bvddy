@@ -15,6 +15,8 @@ export const HackerOverlay = () => {
       audioRef.current.volume = 0.4; // Set reasonable volume
       
       // Attempt playback
+      // We explicitly load() first to ensure the src is fresh
+      audioRef.current.load();
       const playPromise = audioRef.current.play();
       
       if (playPromise !== undefined) {
@@ -110,7 +112,6 @@ export const HackerOverlay = () => {
         autoPlay
         src={AUDIO_URL} 
         onError={() => {
-           // Simple console warn without logging the event object to avoid circular JSON errors
            console.warn("Background audio failed to load.");
         }}
       />
