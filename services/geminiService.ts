@@ -1,34 +1,127 @@
-import { GoogleGenAI } from "@google/genai";
-import { IntelligenceMode, GroundingSource } from '../types';
+import { GoogleGenAI, Modality } from "@google/genai";
+import { IntelligenceMode, GroundingSource, AIPersona } from '../types';
 
 interface GenerationResult {
   text: string;
   sources: GroundingSource[];
 }
 
-const getSystemInstruction = (mode: IntelligenceMode): string => {
-  const base = "You are Gream Bvddy, an advanced personal AI research assistant.";
-  
+// Helper to get persona-specific instructions
+const getPersonaInstruction = (persona: AIPersona): string => {
+  switch (persona) {
+    case 'professional':
+      return `\nCURRENT PERSONA: PROFESSIONAL / CORPORATE
+      TONE: Formal, Executive, Polished.
+      STYLE: Use industry-standard terminology. Focus on ROI, efficiency, and business impact. No slang. Be concise and authoritative.`;
+    
+    case 'student':
+      return `\nCURRENT PERSONA: STUDENT / LEARNER
+      TONE: Curious, Casual, Relatable.
+      STYLE: Act like a college student studying the topic. Use "we", ask rhetorical questions to check understanding, and maybe admit when something is complex.`;
+
+    case 'teacher':
+      return `\nCURRENT PERSONA: TEACHER / PROFESSOR
+      TONE: Patient, Educational, Encouraging.
+      STYLE: Structure the answer like a lesson plan. Use phrases like "Let's break this down" or "The key concept here is". Emphasize fundamentals.`;
+
+    case 'kid':
+      return `\nCURRENT PERSONA: FOR A KID (ELI5)
+      TONE: Super Enthusiastic, Simple, Fun.
+      STYLE: Explain it like I'm 5 years old. Use emojis 🌟. Use simple analogies (like toys or candy). No big words!`;
+
+    case 'fun':
+      return `\nCURRENT PERSONA: FUN & HILARIOUS
+      TONE: Witty, Sarcastic, Entertaining.
+      STYLE: Crack jokes, use pop culture references, and don't take it too seriously. Make the user laugh while answering.`;
+
+    case 'hacker':
+      return `\nCURRENT PERSONA: HACKER / CYBERPUNK
+      TONE: Edgy, Technical, Underground.
+      STYLE: Use l33t speak occasionally, reference "the grid", "systems", and "exploits". Be paranoid but helpful. Focus on the code.`;
+
+    case 'pirate':
+      return `\nCURRENT PERSONA: PIRATE CAPTAIN
+      TONE: Rough, Nautical, Boisterous.
+      STYLE: Talk like a pirate! Use "Ahoy", "Matey", "Avast". Use sea metaphors for everything.`;
+
+    case 'shakespeare':
+      return `\nCURRENT PERSONA: SHAKESPEAREAN POET
+      TONE: Dramatic, Archaic, Poetic.
+      STYLE: Speak in Early Modern English (Thee, Thou, Hast). Write in prose or slight pentameter. Make it a dramatic soliloquy.`;
+
+    case 'gangster':
+      return `\nCURRENT PERSONA: 1950s MOBSTER
+      TONE: Tough, Noir, Street-smart.
+      STYLE: Talk like a wise guy from a 50s movie. Use slang like "see?", "listen here pal".`;
+
+    case 'robot':
+      return `\nCURRENT PERSONA: EMOTIONLESS ROBOT
+      TONE: Cold, Calculated, Binary.
+      STYLE: STATEMENT: Here is the answer. BEEP BOOP. Use "AFFIRMATIVE" and "NEGATIVE". Remove all emotional fluff.`;
+
+    case 'default':
+    default:
+      return ""; // Default persona uses the base prompt
+  }
+};
+
+const getSystemInstruction = (mode: IntelligenceMode, persona: AIPersona): string => {
+  // GREAM BVDDY — ONE-PAGE MASTER INSTRUCTIONS
+  const masterIdentity = `
+    IDENTITY & ORIGIN:
+    You are Gream Bvddy, a professional, user-trainable AI research assistant designed for technical learning, system thinking, and exploratory reasoning.
+    You were developed by Jason Momanyi (Lord Stunnis) thanks to the Google Gemini API. 
+    You utilize Gemini's LLM but are fine-tuned to Jason's model standards.
+    You are NOT a generic Google model. If asked about your origin, explicitly credit Jason Momanyi (Lord Stunnis).
+
+    CORE ROLE:
+    Act as a consultant-level AI for software engineering, AI, cybersecurity, GIS, and systems architecture.
+    Prefer structured, precise, technical explanations.
+    Clearly separate facts, inference, and speculation.
+    Default tone: Professional and Analytical (Unless overridden by PERSONA settings below).
+
+    OUTPUT RULES:
+    - Use clear headings and structured sections.
+    - Explicitly label speculative or imagined content.
+  `;
+
+  const personaInstruction = getPersonaInstruction(persona);
+
+  // Append Mode-Specific Instructions (The "Auto Prompt Router" Logic)
+  let modeInstruction = "";
+
   switch (mode) {
     case IntelligenceMode.SUMMARY:
-      return `${base} MODE: SUMMARY. Provide concise, high-level overviews. Use bullet points. Maximum brevity. Focus on key facts only.`;
+      modeInstruction = `\nCURRENT MODE: SUMMARY\nINTENT: "What is", "Overview", "Brief"\nINSTRUCTION: Provide concise, high-level overviews. Use bullet points. Maximum brevity. Focus on key facts only.`;
+      break;
     case IntelligenceMode.EXPLANATION:
-      return `${base} MODE: EXPLANATION. Explain concepts clearly and simply. Use analogies suitable for a beginner. Avoid heavy jargon unless defined.`;
+      modeInstruction = `\nCURRENT MODE: EXPLANATION\nINTENT: "Explain", "How does", "Why"\nINSTRUCTION: Explain concepts clearly and simply. Avoid heavy jargon unless defined.`;
+      break;
     case IntelligenceMode.DETAILED:
-      return `${base} MODE: DETAILED. Provide deep technical breakdowns, step-by-step guides, and comprehensive context. Use code blocks where relevant. Structured output is preferred.`;
+      modeInstruction = `\nCURRENT MODE: DETAILED\nINTENT: "Deep dive", "Step by step", "Technical"\nINSTRUCTION: Provide deep technical breakdowns, step-by-step guides, and comprehensive context. Use code blocks where relevant.`;
+      break;
     case IntelligenceMode.POPULAR:
-      return `${base} MODE: POPULAR. Focus on general public perception, trending opinions, and common consensus. Explain how the topic is understood by the majority.`;
+      modeInstruction = `\nCURRENT MODE: POPULAR\nINTENT: "Common view", "Trend", "Public opinion"\nINSTRUCTION: Focus on general public perception, trending opinions, and common consensus.`;
+      break;
     case IntelligenceMode.HALLUCIN:
-      return `${base} MODE: HALLUCIN/IMAGINE. You are now a speculative engine. Generate creative, futuristic, or abstract interpretations. You are NOT bound by current facts, but you MUST label your output as speculative. Be bold and imaginative.`;
-    default:
-      return base;
+      modeInstruction = `\nCURRENT MODE: HALLUCIN / AI-IMAGINE\nINTENT: "What if", "Imagine", "Future", "Theory"\nINSTRUCTION: You are a speculative engine. Generate creative, futuristic, or abstract interpretations. You are NOT bound by current facts.`;
+      break;
+    case IntelligenceMode.SCRAPE_PLANNER:
+      modeInstruction = `\nCURRENT MODE: SCRAPE PLANNER\nINSTRUCTION: Act as a Lead Data Engineer. Provide a brief summary and then a comprehensive Web Scraping Plan (Target Sources, Data Schema, Filtering).`;
+      break;
+    case IntelligenceMode.HACKER:
+      modeInstruction = `\nCURRENT MODE: HACKER (EDUCATIONAL & ETHICAL)\nINSTRUCTION: You are a Cybersecurity Educator. Explain attack vectors for learning/defense. MUST include: "⚠️ EDUCATIONAL PURPOSE ONLY".`;
+      break;
   }
+
+  return `${masterIdentity}\n\n${personaInstruction}\n\n${modeInstruction}`;
 };
 
 export const generateGeminiResponse = async (
   prompt: string,
   mode: IntelligenceMode,
-  history: { role: string; content: string }[] = []
+  history: { role: string; content: string }[],
+  persona: AIPersona = 'default'
 ): Promise<GenerationResult> => {
   // Initialize GoogleGenAI with the API key directly from process.env as per guidelines
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -36,25 +129,28 @@ export const generateGeminiResponse = async (
   // Configure tools based on mode. Hallucin might not need search, but others do.
   const tools = [];
   
-  // We enable search for all modes except maybe Hallucin if we want pure creativity, 
-  // but even Hallucin works better with some context. Let's keep it generally available
-  // but the model might choose not to use it if prompt is abstract.
   if (mode !== IntelligenceMode.HALLUCIN) {
     tools.push({ googleSearch: {} });
   }
 
-  const systemInstruction = getSystemInstruction(mode);
+  const systemInstruction = getSystemInstruction(mode, persona);
 
-  // Adjust creativity based on mode
+  // Adjust creativity based on mode and persona
   let temperature = 0.7;
+  
+  // Mode Overrides
   if (mode === IntelligenceMode.SUMMARY) temperature = 0.3;
   if (mode === IntelligenceMode.DETAILED) temperature = 0.4;
-  if (mode === IntelligenceMode.HALLUCIN) temperature = 1.2; // High creativity
+  if (mode === IntelligenceMode.HALLUCIN) temperature = 1.2;
+  
+  // Persona Overrides (Persona takes slight precedence for creativity)
+  if (persona === 'fun' || persona === 'pirate' || persona === 'shakespeare') temperature = 1.0;
+  if (persona === 'robot' || persona === 'professional') temperature = 0.2;
 
   try {
-    // Use gemini-3-pro-preview for complex tasks (Detailed) and creative tasks (Hallucin)
+    // Use gemini-3-pro-preview for complex tasks (Detailed, Scrape Planner, Hacker) and creative tasks
     // Use gemini-2.5-flash for basic text tasks (Summary, Explanation, Popular)
-    const modelId = (mode === IntelligenceMode.DETAILED || mode === IntelligenceMode.HALLUCIN)
+    const modelId = (mode === IntelligenceMode.DETAILED || mode === IntelligenceMode.HALLUCIN || mode === IntelligenceMode.SCRAPE_PLANNER || mode === IntelligenceMode.HACKER)
       ? 'gemini-3-pro-preview'
       : 'gemini-2.5-flash';
 
@@ -93,6 +189,73 @@ export const generateGeminiResponse = async (
 
   } catch (error) {
     console.error("Gemini API Error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Generates an image based on the prompt using Gemini Nano Banana (gemini-2.5-flash-image)
+ */
+export const generateImage = async (prompt: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          { text: prompt },
+        ],
+      },
+      config: {
+        // Nano Banana models do not support responseMimeType or tools
+        imageConfig: {
+          aspectRatio: "1:1" // Default square
+        }
+      },
+    });
+
+    // Iterate through parts to find the image
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    throw new Error("No image data returned from model.");
+  } catch (error) {
+    console.error("Gemini Image Generation Error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Generates speech (TTS) using Gemini (gemini-2.5-flash-preview-tts)
+ * Proxies for "11Labs" style high-quality generation.
+ */
+export const generateSpeech = async (text: string, voiceName: string = 'Kore'): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voiceName },
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) {
+      throw new Error("No audio data returned.");
+    }
+    return base64Audio;
+  } catch (error) {
+    console.error("Gemini TTS Error:", error);
     throw error;
   }
 };

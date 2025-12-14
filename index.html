@@ -33,6 +33,32 @@
       .hallucin-mode-bg {
         background: linear-gradient(135deg, #2e1065 0%, #0f172a 100%);
       }
+      
+      /* Animations */
+      @keyframes shake {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-5deg); }
+        75% { transform: rotate(5deg); }
+      }
+      .animate-shake {
+        animation: shake 2s ease-in-out infinite;
+      }
+      
+      @keyframes orbit {
+        from { transform: rotate(0deg) translateX(30px) rotate(0deg); }
+        to { transform: rotate(360deg) translateX(30px) rotate(-360deg); }
+      }
+      .animate-orbit {
+        animation: orbit 3s linear infinite;
+      }
+      
+      @keyframes pulse-glow {
+        0%, 100% { filter: drop-shadow(0 0 5px rgba(234, 179, 8, 0.5)); }
+        50% { filter: drop-shadow(0 0 15px rgba(234, 179, 8, 1)); }
+      }
+      .animate-pulse-glow {
+        animation: pulse-glow 2s ease-in-out infinite;
+      }
     </style>
   <script type="importmap">
 {

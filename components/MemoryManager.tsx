@@ -27,12 +27,7 @@ export const MemoryManager: React.FC<Props> = ({ onClose }) => {
   };
 
   const filteredCommands = useMemo(() => {
-    const lower = searchTerm.toLowerCase();
-    return commands.filter(c => 
-      c.trigger.includes(lower) || 
-      c.response.toLowerCase().includes(lower) ||
-      (c.description && c.description.toLowerCase().includes(lower))
-    );
+    return MemoryStore.search(searchTerm);
   }, [commands, searchTerm]);
 
   // Calculate generic stats
@@ -99,7 +94,7 @@ export const MemoryManager: React.FC<Props> = ({ onClose }) => {
             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors w-4 h-4" />
             <input 
               type="text" 
-              placeholder="Search triggers or responses..." 
+              placeholder="Search triggers or responses... (Fuzzy matching enabled)" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all placeholder:text-slate-600"
@@ -123,10 +118,10 @@ export const MemoryManager: React.FC<Props> = ({ onClose }) => {
                  <IconBrain className="w-8 h-8 text-slate-600" />
               </div>
               <p className="text-lg font-medium text-slate-400">
-                {searchTerm ? "No matches found." : "Memory Bank Empty"}
+                {searchTerm ? "No fuzzy matches found." : "Memory Bank Empty"}
               </p>
               <p className="text-sm max-w-xs mt-2 text-slate-600">
-                {searchTerm ? "Try a different search query." : "Train the AI by clicking the edit icon on your messages to add custom responses."}
+                {searchTerm ? "Try simplifying your query." : "Train the AI by clicking the edit icon on your messages to add custom responses."}
               </p>
             </div>
           ) : (

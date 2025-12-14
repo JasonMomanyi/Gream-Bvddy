@@ -1,10 +1,26 @@
+
 export enum IntelligenceMode {
   SUMMARY = 'SUMMARY',
   EXPLANATION = 'EXPLANATION',
   DETAILED = 'DETAILED',
   POPULAR = 'POPULAR',
-  HALLUCIN = 'HALLUCIN'
+  HALLUCIN = 'HALLUCIN',
+  SCRAPE_PLANNER = 'SCRAPE_PLANNER',
+  HACKER = 'HACKER'
 }
+
+export type AIPersona = 
+  | 'default'
+  | 'professional'
+  | 'student'
+  | 'teacher'
+  | 'kid'
+  | 'fun'
+  | 'hacker'
+  | 'pirate'
+  | 'shakespeare'
+  | 'gangster'
+  | 'robot';
 
 export interface GroundingSource {
   title: string;
@@ -17,6 +33,7 @@ export interface Message {
   content: string;
   timestamp: number;
   mode?: IntelligenceMode;
+  persona?: AIPersona;
   sources?: GroundingSource[];
   isTrainedResponse?: boolean;
 }
