@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { IconAmongUs, IconMusic } from './Icons';
 
 // Direct link to the "Gedagedigedagedago" / "Shut Up Chicken" meme audio.
-// SoundCloud URLs are web pages and cannot be streamed directly in <audio> tags, 
-// so we use this direct file source for the exact meme sound requested.
 const AUDIO_URL = "https://www.myinstants.com/media/sounds/gedagedigedagedago.mp3"; 
 
 export const HackerOverlay = () => {
@@ -15,12 +13,15 @@ export const HackerOverlay = () => {
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = 0.4; // Set reasonable volume
+      
+      // Attempt playback
       const playPromise = audioRef.current.play();
       
       if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          // Auto-play was prevented
-          console.log("Audio autoplay prevented by browser policy:", error);
+        playPromise.catch((error) => {
+          // Auto-play might be prevented by browser policy if no interaction has occurred yet.
+          // This is normal behavior for browsers.
+          console.debug("Audio autoplay prevented:", error);
         });
       }
     }
@@ -31,7 +32,7 @@ export const HackerOverlay = () => {
       audioRef.current.muted = !audioRef.current.muted;
       setIsMuted(audioRef.current.muted);
       if (audioRef.current.paused && !audioRef.current.muted) {
-        audioRef.current.play();
+        audioRef.current.play().catch(e => console.error("Playback failed", e));
       }
     }
   };
@@ -102,7 +103,17 @@ export const HackerOverlay = () => {
       />
 
       {/* Audio Element */}
-      <audio ref={audioRef} loop src={AUDIO_URL} />
+      {/* Removed crossOrigin="anonymous" to prevent CORS issues with the MP3 source */}
+      <audio 
+        ref={audioRef} 
+        loop 
+        autoPlay
+        src={AUDIO_URL} 
+        onError={() => {
+           // Simple console warn without logging the event object to avoid circular JSON errors
+           console.warn("Background audio failed to load.");
+        }}
+      />
 
       {/* Foreground Content Container */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-4">

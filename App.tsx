@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { generateGeminiResponse } from './services/geminiService';
+import { generatePuterResponse } from './services/puterService';
 import { MemoryStore } from './services/memoryStore';
-import { Message, IntelligenceMode, ProcessingState, AIPersona } from './types';
+import { Message, IntelligenceMode, ProcessingState, AIPersona, AVAILABLE_MODELS } from './types';
 import { 
   IconSearch, IconSparkles, IconSend, IconDatabase, IconEdit, 
   IconGreamSkull, IconScrape, IconShield, IconCopy, IconRefresh, 
-  IconStar, IconGlobe, IconDiscord, IconInstagram, IconMedia, IconPersonSuitcase 
+  IconStar, IconDiscord, IconMedia, IconPersonSuitcase, IconBrain, IconNetworkGlobe
 } from './components/Icons';
 import { MemoryManager } from './components/MemoryManager';
 import { TrainModal } from './components/TrainModal';
 import { MediaHub } from './components/MediaHub';
 import { PresetSelector } from './components/PresetSelector';
+import { ModelSelector } from './components/ModelSelector';
 import { HackerOverlay } from './components/HackerOverlay';
 
 export default function App() {
@@ -21,16 +23,20 @@ export default function App() {
   const isMemoryOpen = location.pathname === '/memory';
 
   // State
-  // Default to SCRAPE_PLANNER as requested
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState<IntelligenceMode>(IntelligenceMode.SCRAPE_PLANNER);
   const [persona, setPersona] = useState<AIPersona>('default');
+  const [currentModelId, setCurrentModelId] = useState<string>('gemini-1.5-flash');
   const [processing, setProcessing] = useState<ProcessingState>('idle');
   const [memoryCount, setMemoryCount] = useState(0);
   const [showMediaHub, setShowMediaHub] = useState(false);
   const [showPresetSelector, setShowPresetSelector] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false);
   
+  // Error handling tips
+  const [showModelTip, setShowModelTip] = useState(false);
+
   // Modals
   const [trainData, setTrainData] = useState<{ show: boolean, trigger: string }>({ show: false, trigger: '' });
 
@@ -55,6 +61,10 @@ export default function App() {
   useEffect(() => {
     refreshMemoryCount();
   }, [location.pathname]);
+
+  // Get current model info
+  const activeModel = AVAILABLE_MODELS.find(m => m.id === currentModelId) || AVAILABLE_MODELS[0];
+  const isBaseAI = activeModel.id === 'gemini-1.5-flash';
 
   // Suggestions based on Mode
   const getSuggestions = (currentMode: IntelligenceMode) => {
@@ -111,20 +121,18 @@ export default function App() {
           msg = parsed.error.message;
         }
       } catch (e) {
-        // Parsing failed, stick to original string but truncate
         if (msg.length > 300) msg = msg.substring(0, 300) + "...";
       }
     }
 
-    // User friendly mapping
     if (msg.includes('429') || msg.includes('Quota exceeded') || msg.includes('RESOURCE_EXHAUSTED')) {
-      return "⚠️ **Capacity Overload:** The AI model is currently receiving too many requests. Please wait a minute before trying again.";
+      return "capacity_error";
     }
     if (msg.includes('API Key is missing')) {
-      return "⚠️ **Configuration Error:** API Key is missing. Please check your Vercel settings.";
+      return "⚠️ **Configuration Error:** API Key is missing.";
     }
     if (msg.includes('503')) {
-      return "⚠️ **Service Busy:** The AI servers are overloaded. Please try again in a few moments.";
+      return "busy_error";
     }
     
     return `⚠️ **System Error:** ${msg}`;
@@ -136,13 +144,17 @@ export default function App() {
     const textToSend = suggestion || input;
     if (!textToSend.trim()) return;
 
+    // Hide previous tips
+    setShowModelTip(false);
+
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
       content: textToSend,
       timestamp: Date.now(),
       mode: mode,
-      persona: persona // Store persona in history for context if needed later
+      persona: persona,
+      modelUsed: activeModel.name
     };
 
     setMessages(prev => [...prev, userMsg]);
@@ -162,19 +174,25 @@ export default function App() {
           timestamp: Date.now(),
           mode: mode,
           persona: persona,
-          isTrainedResponse: true
+          isTrainedResponse: true,
+          modelUsed: 'Memory Bank'
         }]);
         return;
       }
 
-      // 2. Fallback to Gemini with Grounding
-      const history = messages.map(m => ({ role: m.role, content: m.content })).slice(-5); // Keep last 5 for context
+      // 2. Determine Provider (Google or Puter)
+      const history = messages.map(m => ({ role: m.role, content: m.content })).slice(-5);
       
-      if (mode !== IntelligenceMode.HALLUCIN) {
-        setProcessing('searching');
-      }
+      let result;
 
-      const result = await generateGeminiResponse(textToSend, mode, history, persona);
+      if (activeModel.provider === 'google') {
+        if (mode !== IntelligenceMode.HALLUCIN) setProcessing('searching');
+        result = await generateGeminiResponse(textToSend, mode, history, persona);
+      } else {
+        // Puter Provider (Claude, GPT, DeepSeek, Grok)
+        setProcessing('searching'); // Puter takes a moment usually
+        result = await generatePuterResponse(textToSend, activeModel.id, mode, history, persona);
+      }
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
@@ -183,16 +201,29 @@ export default function App() {
         timestamp: Date.now(),
         mode: mode,
         persona: persona,
-        sources: result.sources
+        sources: result.sources,
+        modelUsed: activeModel.name
       }]);
     } catch (error: any) {
       console.error(error);
-      const friendlyMsg = parseErrorMessage(error);
+      const parsedMsg = parseErrorMessage(error);
       
+      let finalErrorMsg = "";
+      // Smart Tip Integration
+      if (parsedMsg === "capacity_error") {
+        finalErrorMsg = `⚠️ **System Overload (${activeModel.name})**\nThis model is currently experiencing high traffic from multiple users.`;
+        setShowModelTip(true); // Trigger the UI tip
+      } else if (parsedMsg === "busy_error") {
+        finalErrorMsg = `⚠️ **Service Busy.**\nThe AI provider is temporarily overloaded.`;
+        setShowModelTip(true);
+      } else {
+        finalErrorMsg = parsedMsg;
+      }
+
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'model',
-        content: friendlyMsg,
+        content: finalErrorMsg,
         timestamp: Date.now()
       }]);
     } finally {
@@ -208,7 +239,6 @@ export default function App() {
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    // Could add a toast here, but for simplicity we assume it works
   };
 
   // Renderers
@@ -231,26 +261,35 @@ export default function App() {
   return (
     <div className={`flex flex-col h-screen overflow-hidden ${mode === IntelligenceMode.HALLUCIN ? 'hallucin-mode-bg' : 'bg-slate-900'}`}>
       
-      {/* Hacker Mode Overlay with Meme Character */}
       {mode === IntelligenceMode.HACKER && <HackerOverlay />}
 
       {/* Header */}
       <header className="flex-none h-16 border-b border-white/10 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-2" title="Gream Bvddy - Personal AI Research Assistant">
-          {/* Main App Icon: Happy Green Skull with Gemini Star */}
           <IconGreamSkull className="text-green-400 w-8 h-8" />
-          <h1 className="text-lg font-bold tracking-tight text-white">Gream Bvddy <span className="text-xs font-normal text-slate-400 ml-2 border border-slate-700 px-2 py-0.5 rounded">v1.3</span></h1>
+          <h1 className="text-lg font-bold tracking-tight text-white">Gream Bvddy <span className="text-xs font-normal text-slate-400 ml-2 border border-slate-700 px-2 py-0.5 rounded">v1.4</span></h1>
         </div>
         
         <div className="flex items-center gap-4">
            
-           {/* Presets Button */}
+           {/* Model Selector Button */}
+           <button 
+             onClick={() => setShowModelSelector(true)}
+             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 text-xs font-bold hover:bg-cyan-900/50 transition-all"
+             title="Change AI Model"
+           >
+             <IconBrain className="w-4 h-4" />
+             <span className="hidden sm:inline">{activeModel.name}</span>
+           </button>
+
+           <div className="h-6 w-px bg-slate-700 mx-1"></div>
+
            <button 
              onClick={() => setShowPresetSelector(true)}
              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg hover:scale-105 transition-all ${
                persona !== 'default' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
              }`}
-             title="Change AI Persona / Preset"
+             title="Change AI Persona"
            >
              <IconPersonSuitcase className="w-4 h-4" />
              <span className="hidden sm:inline">
@@ -258,17 +297,13 @@ export default function App() {
              </span>
            </button>
 
-           {/* Media Hub Button */}
            <button 
              onClick={() => setShowMediaHub(true)}
-             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold hover:shadow-lg hover:scale-105 transition-all"
-             title="Multimedia Generation (Audio/Video/Graphics)"
+             className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold hover:shadow-lg hover:scale-105 transition-all"
            >
              <IconMedia className="w-4 h-4" />
              <span className="hidden sm:inline">Media Hub</span>
            </button>
-
-           <div className="h-6 w-px bg-slate-700 mx-1"></div>
 
            {messages.length > 0 && (
              <button
@@ -281,7 +316,6 @@ export default function App() {
            )}
            <button 
              onClick={() => navigate('/memory')}
-             title="Manage trained commands and memory"
              className="relative text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-2 text-sm font-medium group"
            >
              <div className="relative">
@@ -293,26 +327,45 @@ export default function App() {
                  </span>
                )}
              </div>
-             Memory
-             {memoryCount > 0 && (
-               <span className="bg-slate-800 text-slate-200 text-[10px] px-1.5 py-0.5 rounded-md border border-slate-700 group-hover:border-cyan-500/50 transition-colors">
-                 {memoryCount}
-               </span>
-             )}
+             <span className="hidden sm:inline">Memory</span>
            </button>
         </div>
       </header>
+
+      {/* High Traffic Tip Overlay */}
+      {showModelTip && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 w-[90%] max-w-md bg-slate-800/95 border border-amber-500 text-white px-5 py-4 rounded-xl shadow-2xl flex items-center justify-between gap-4 animate-bounce-custom backdrop-blur-md">
+           <div className="flex items-start gap-3">
+             <div className="bg-amber-500/20 p-2 rounded-lg">
+                <IconSparkles className="w-6 h-6 text-amber-500" />
+             </div>
+             <div className="flex flex-col">
+               <span className="font-bold text-sm text-amber-400">High Traffic Detected</span>
+               <span className="text-xs text-slate-300 mt-1 leading-relaxed">
+                 The current model ({activeModel.name}) is loaded with multiple users.
+               </span>
+             </div>
+           </div>
+           <button 
+             onClick={() => { setShowModelTip(false); setShowModelSelector(true); }}
+             className="bg-amber-500 text-slate-900 px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-400 transition-colors shadow-lg whitespace-nowrap"
+           >
+             Switch Model
+           </button>
+        </div>
+      )}
 
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-            {/* Splash Icon */}
             <IconGreamSkull className="w-20 h-20 mb-4 text-green-500/80" />
             <h2 className="text-2xl font-bold text-white mb-2">System Online</h2>
-            <p className="max-w-md text-slate-400 mb-6">Select a mode and initiate a query. Gream Bvddy will research, process, and adapt to your needs.</p>
+            {/* UPDATED: Displays 'Base AI' instead of generic model name */}
+            <p className="max-w-md text-slate-400 mb-6">
+              Running on <strong>{activeModel.name}</strong>. Select a mode and initiate a query.
+            </p>
             
-            {/* Prompt Suggestions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-lg w-full px-4">
               {getSuggestions(mode).map((suggestion, idx) => (
                 <button
@@ -324,43 +377,47 @@ export default function App() {
                 </button>
               ))}
             </div>
+            
+            {/* Persistent Tip for new users */}
+            <div className="mt-8 text-[10px] text-slate-600 flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800">
+               <IconBrain className="w-3 h-3" />
+               <span>Tip: If Base AI is slow, try switching to Claude or GPT in the model selector.</span>
+            </div>
           </div>
         )}
 
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] md:max-w-[70%] group relative`}>
-              {/* Message Bubble */}
               <div className={`p-4 rounded-2xl relative ${
                 msg.role === 'user' 
                   ? 'bg-slate-700 text-white rounded-br-none' 
                   : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none shadow-lg pb-8'
               }`}>
-                {/* Header for AI Messages */}
                 {msg.role === 'model' && (
-                  <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase tracking-wider opacity-60">
-                    <span className={`flex items-center gap-1 ${msg.isTrainedResponse ? 'text-green-400' : 'text-cyan-400'}`}>
-                      {/* Mode Icon */}
-                      {msg.mode === IntelligenceMode.SCRAPE_PLANNER && !msg.isTrainedResponse && <IconScrape className="w-3 h-3" />}
-                      {msg.mode === IntelligenceMode.HACKER && !msg.isTrainedResponse && <IconShield className="w-3 h-3" />}
-                      
-                      {/* Persona Label */}
-                      {msg.isTrainedResponse 
-                        ? 'Memory Recall' 
-                        : (msg.persona && msg.persona !== 'default' 
-                            ? `${msg.persona.toUpperCase()} MODE` 
-                            : msg.mode?.replace('_', ' '))}
+                  <div className="flex items-center justify-between mb-2 opacity-60">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                      <span className={`flex items-center gap-1 ${msg.isTrainedResponse ? 'text-green-400' : 'text-cyan-400'}`}>
+                        {msg.mode === IntelligenceMode.SCRAPE_PLANNER && !msg.isTrainedResponse && <IconScrape className="w-3 h-3" />}
+                        {msg.mode === IntelligenceMode.HACKER && !msg.isTrainedResponse && <IconShield className="w-3 h-3" />}
+                        {msg.isTrainedResponse 
+                          ? 'Memory Recall' 
+                          : (msg.persona && msg.persona !== 'default' 
+                              ? `${msg.persona.toUpperCase()}` 
+                              : msg.mode?.replace('_', ' '))}
+                      </span>
+                    </div>
+                    {/* Show Model Used in Message */}
+                    <span className="text-[10px] bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded text-slate-400">
+                      {msg.modelUsed || activeModel.name}
                     </span>
-                    {msg.isTrainedResponse && <IconDatabase className="w-3 h-3 text-green-400" />}
                   </div>
                 )}
                 
-                {/* Content */}
                 <div className="prose prose-invert prose-sm leading-relaxed whitespace-pre-wrap">
                   {msg.content}
                 </div>
 
-                {/* Grounding Sources */}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-white/10">
                     <p className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1">
@@ -383,7 +440,6 @@ export default function App() {
                   </div>
                 )}
                 
-                {/* Copy Button (Model Only) */}
                 {msg.role === 'model' && (
                   <button 
                     onClick={() => handleCopy(msg.content)}
@@ -395,7 +451,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* Train Action (Only for User messages) */}
               {msg.role === 'user' && (
                 <button
                   onClick={() => setTrainData({ show: true, trigger: msg.content })}
@@ -411,13 +466,12 @@ export default function App() {
 
         {processing !== 'idle' && (
           <div className="flex justify-start items-center p-4">
-             {/* New Skull & Star Loading Animation */}
              <div className="relative w-12 h-12 flex items-center justify-center">
                 <IconStar className="absolute text-yellow-400 w-4 h-4 animate-orbit z-20 animate-pulse-glow" />
                 <IconGreamSkull className="text-slate-400 w-8 h-8 animate-shake z-10" />
              </div>
              <span className="text-xs font-mono text-cyan-400 uppercase ml-3 animate-pulse">
-                {processing === 'searching' ? 'Scanning Network...' : 'Thinking...'}
+                {activeModel.provider === 'puter' ? `Connecting to ${activeModel.name}...` : 'Thinking...'}
              </span>
           </div>
         )}
@@ -427,31 +481,38 @@ export default function App() {
       {/* Input Area */}
       <footer className="flex-none p-4 md:p-6 bg-slate-900 border-t border-white/5">
         <div className="max-w-4xl mx-auto space-y-4">
-          
-          {/* Mode Selector */}
           <div className="flex flex-wrap gap-2 justify-center md:justify-start">
             {renderModeButton(IntelligenceMode.SCRAPE_PLANNER, 'Scrape Plan', 'bg-amber-600', 'Generate data extraction strategies', <IconScrape className="w-3 h-3"/>)}
-            {renderModeButton(IntelligenceMode.SUMMARY, 'Summary', 'bg-emerald-600', 'Concise overview with bullet points')}
-            {renderModeButton(IntelligenceMode.EXPLANATION, 'Explain', 'bg-blue-600', 'Simple analogies for beginners')}
-            {renderModeButton(IntelligenceMode.DETAILED, 'Detailed', 'bg-indigo-600', 'Deep technical breakdowns and steps')}
-            {renderModeButton(IntelligenceMode.POPULAR, 'Popular', 'bg-orange-600', 'Trending opinions and general consensus')}
-            {renderModeButton(IntelligenceMode.HACKER, 'Hacker', 'bg-red-700', 'Educational Security & Defense Analysis', <IconShield className="w-3 h-3"/>)}
-            {renderModeButton(IntelligenceMode.HALLUCIN, 'Imagine', 'bg-purple-600', 'Creative and speculative generation')}
+            {renderModeButton(IntelligenceMode.SUMMARY, 'Summary', 'bg-emerald-600', 'Concise overview')}
+            {renderModeButton(IntelligenceMode.EXPLANATION, 'Explain', 'bg-blue-600', 'Simple analogies')}
+            {renderModeButton(IntelligenceMode.DETAILED, 'Detailed', 'bg-indigo-600', 'Deep technical breakdowns')}
+            {renderModeButton(IntelligenceMode.POPULAR, 'Popular', 'bg-orange-600', 'Trending opinions')}
+            {renderModeButton(IntelligenceMode.HACKER, 'Hacker', 'bg-red-700', 'Educational Security', <IconShield className="w-3 h-3"/>)}
+            {renderModeButton(IntelligenceMode.HALLUCIN, 'Imagine', 'bg-purple-600', 'Creative generation')}
           </div>
 
-          {/* Input Box */}
           <form onSubmit={(e) => handleSendMessage(e)} className="relative group">
             <div className={`absolute -inset-0.5 rounded-lg blur opacity-20 transition duration-1000 group-hover:opacity-50 ${
               mode === IntelligenceMode.HALLUCIN ? 'bg-purple-600' : 'bg-cyan-500'
             }`}></div>
-            <div className="relative flex items-center bg-slate-950 rounded-lg border border-slate-700 focus-within:border-slate-500 transition-colors">
+            
+            {/* UPDATED: Input Bar Styling with Conditional Base AI Glow and Mobile Clarity */}
+            <div className={`relative flex items-center bg-slate-950/90 rounded-xl border transition-all duration-300 ${
+              isBaseAI 
+                ? 'border-green-400/80 shadow-[0_0_15px_-2px_rgba(74,222,128,0.5)] ring-1 ring-green-400/30' 
+                : 'border-slate-700 focus-within:border-slate-500'
+            }`}>
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={messages.length === 0 ? "Enter a topic to research or a command..." : "Follow up..."}
-                className="flex-1 bg-transparent border-none text-white px-4 py-4 focus:ring-0 placeholder-slate-500"
+                placeholder={
+                  messages.length === 0 
+                  ? `Ask ${activeModel.name} anything...` 
+                  : "Follow up..."
+                }
+                className="flex-1 bg-transparent border-none text-white px-4 py-4 focus:ring-0 placeholder-slate-400 text-base md:text-sm"
                 disabled={processing !== 'idle'}
               />
               <button
@@ -465,67 +526,59 @@ export default function App() {
             </div>
           </form>
           
-          <div className="flex flex-col items-center gap-2 text-[10px] font-mono text-slate-600">
-             <span>
-              {mode === IntelligenceMode.HALLUCIN 
-                ? "WARNING: Speculative Mode Active. Output may contain generated fiction." 
-                : "Standard Intelligence Active. Grounded in search where applicable."}
-            </span>
-            <div className="flex gap-6 mt-2 opacity-80 hover:opacity-100 transition-opacity">
-              <a href="https://jasonmomanyi.netlify.app" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 text-slate-500 hover:text-cyan-400 transition-colors" title="Visit Developer Website">
-                <div className="p-1.5 rounded-full bg-slate-800 group-hover:bg-cyan-900/30 transition-colors">
-                   <IconGlobe className="w-4 h-4" />
-                </div>
-                <span>Jason Momanyi</span>
-              </a>
-              <a href="https://discord.com/users/1092210946547654730" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 text-slate-500 hover:text-indigo-400 transition-colors" title="Contact on Discord">
-                <div className="p-1.5 rounded-full bg-slate-800 group-hover:bg-indigo-900/30 transition-colors">
-                   <IconDiscord className="w-4 h-4" />
-                </div>
-                <span>Discord</span>
-              </a>
-              <a href="https://instagram.com/lord_stunnis" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 text-slate-500 hover:text-pink-400 transition-colors" title="Visit Instagram">
-                <div className="p-1.5 rounded-full bg-slate-800 group-hover:bg-pink-900/30 transition-colors">
-                   <IconInstagram className="w-4 h-4" />
-                </div>
-                <span>@lord_stunnis</span>
-              </a>
-            </div>
+          {/* UPDATED: Mobile Footer with Icon-Only Links */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-mono text-slate-600 w-full px-2 md:px-0">
+             <div className="text-center md:text-left order-2 md:order-1 w-full md:w-auto">
+                 {activeModel.id === 'gemini-1.5-flash' 
+                   ? 'Powered by Gemini Model: GreamBvd(Base)'
+                   : activeModel.provider === 'puter'
+                     ? `Powered by Puter.js • Model: ${activeModel.name}`
+                     : `Powered by Google Gemini • Model: ${activeModel.name}`
+                 }
+             </div>
+             
+             <div className="order-1 md:order-2 w-full md:w-auto flex justify-center md:justify-end gap-3">
+               {/* Website Icon */}
+               <a 
+                 href="https://jasonmomanyi.netlify.app" 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="group p-2 rounded-full hover:bg-slate-800 transition-all border border-slate-700/50 hover:border-cyan-500/50"
+                 title="Developer Website"
+               >
+                 <IconNetworkGlobe className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 transition-colors animate-pulse-glow" />
+               </a>
+               
+               {/* Discord Icon */}
+               <a 
+                 href="https://discord.com/users/1092210946547654730" 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="group p-2 rounded-full hover:bg-slate-800 transition-all border border-slate-700/50 hover:border-indigo-500/50"
+                 title="Discord Profile"
+               >
+                 <IconDiscord className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 transition-colors" />
+               </a>
+             </div>
           </div>
         </div>
       </footer>
 
       {/* Overlays */}
-      {isMemoryOpen && (
-        <MemoryManager 
-          onClose={() => {
-            navigate('/');
-          }} 
-        />
-      )}
-      {showMediaHub && (
-        <MediaHub 
-          onClose={() => setShowMediaHub(false)}
-        />
-      )}
-      {showPresetSelector && (
-        <PresetSelector
-          currentPersona={persona}
-          onSelect={setPersona}
-          onClose={() => setShowPresetSelector(false)}
-        />
-      )}
+      {isMemoryOpen && <MemoryManager onClose={() => navigate('/')} />}
+      {showMediaHub && <MediaHub onClose={() => setShowMediaHub(false)} />}
+      {showPresetSelector && <PresetSelector currentPersona={persona} onSelect={setPersona} onClose={() => setShowPresetSelector(false)} />}
+      {showModelSelector && <ModelSelector currentModelId={currentModelId} onSelect={setCurrentModelId} onClose={() => setShowModelSelector(false)} />}
       {trainData.show && (
         <TrainModal 
           initialTrigger={trainData.trigger} 
           onClose={() => setTrainData({ show: false, trigger: '' })}
           onSuccess={(trigger) => {
              refreshMemoryCount();
-             // Optional: Add a system message confirming learning
              setMessages(prev => [...prev, {
                id: crypto.randomUUID(),
                role: 'model',
-               content: `I have successfully learned the command "${trigger}". I will now use your custom response for this input.`,
+               content: `I have successfully learned the command "${trigger}".`,
                timestamp: Date.now(),
                isTrainedResponse: true
              }]);

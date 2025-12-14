@@ -15,6 +15,7 @@
 - [System Architecture & Workflows](#-system-architecture--workflows)
 - [Prerequisites](#-prerequisites)
 - [Local Installation](#-local-installation)
+- [📱 Android APK Build Guide](#-android-apk-build-guide)
 - [Deployment Guides](#-deployment-guides)
   - [Vercel (Recommended)](#1-vercel-free--recommended)
   - [Netlify](#2-netlify-free)
@@ -131,6 +132,52 @@ Open your browser to `http://localhost:5173`.
 
 ---
 
+## 📱 Android APK Build Guide
+
+Gream Bvddy is mobile-ready. Follow these instructions to build an APK file that you can publish on GitHub or install on your phone.
+
+**Requirement:** You must have [Android Studio](https://developer.android.com/studio) installed on your computer.
+
+### Step 1: Install Capacitor
+Run these commands in your project terminal to install the mobile wrapper tools:
+```bash
+npm install @capacitor/core @capacitor/cli @capacitor/android
+npx cap init
+```
+*   **Name:** Gream Bvddy
+*   **Package ID:** `com.gream.bvddy`
+*   **Web directory:** `dist`
+
+### Step 2: Build the Web Assets
+You must verify your `.env` file exists with your `API_KEY` before this step.
+```bash
+npm run build
+```
+*This compiles your React code and bakes in the API Key so the app works offline/standalone.*
+
+### Step 3: Add Android Platform & Sync
+```bash
+npx cap add android
+npx cap sync
+```
+
+### Step 4: Generate APK
+1.  Open the project in Android Studio:
+    ```bash
+    npx cap open android
+    ```
+2.  Wait for the project to sync (loading bars at the bottom right).
+3.  In the top menu, go to **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
+4.  Once complete, a popup will appear. Click **Locate**.
+5.  Rename `app-debug.apk` to `GreamBvddy-v1.3.apk`.
+
+### Step 5: Publish to GitHub
+1.  Go to your GitHub Repo > **Releases**.
+2.  Draft a new release (e.g., `v1.3-android`).
+3.  Upload the `.apk` file as a binary attachment.
+
+---
+
 ## 🚀 Deployment Guides
 
 ### 1. Vercel (Free & Recommended)
@@ -219,6 +266,6 @@ Created by **Jason Momanyi**.
 
 Because this is a **client-side application**, your API key is used directly in the browser. 
 
-*   **For Personal Use:** This is acceptable.
-*   **For Public Sharing:** If you share the live URL, others can technically inspect the network traffic and see your key.
+*   **For Personal Use/Mobile App:** This is acceptable.
+*   **For Public Web:** If you share the live URL, others can technically inspect the network traffic and see your key.
     *   **Mitigation:** Go to [Google AI Studio > API Keys](https://aistudio.google.com/app/apikey). Click your key, select **"API key restrictions"**, select **"Websites"**, and enter your deployed URL (e.g., `https://gream-bvddy.vercel.app`). This prevents unauthorized usage of your key outside your specific domain.

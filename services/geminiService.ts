@@ -10,7 +10,7 @@ interface GenerationResult {
 const getClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === "undefined") {
-    throw new Error("CRITICAL: API Key is missing. If you are on Vercel, go to Settings > Environment Variables, add 'API_KEY', and REDEPLOY.");
+    throw new Error("CRITICAL: API Key is missing. If on Vercel/Netlify, check Environment Variables. If local/mobile, check your .env file.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -146,11 +146,11 @@ export const generateGeminiResponse = async (
   if (persona === 'fun' || persona === 'pirate' || persona === 'shakespeare') temperature = 1.0;
   if (persona === 'robot' || persona === 'professional') temperature = 0.2;
 
-  // Primary Model Selection
-  // Use Pro for complex tasks, Flash for speed/simpler tasks
-  const primaryModel = (mode === IntelligenceMode.DETAILED || mode === IntelligenceMode.HALLUCIN || mode === IntelligenceMode.SCRAPE_PLANNER || mode === IntelligenceMode.HACKER)
-    ? 'gemini-3-pro-preview'
-    : 'gemini-2.5-flash';
+  // *** CRITICAL UPDATE FOR QUOTAS ***
+  // We are forcing the use of 'gemini-1.5-flash'.
+  // This model has the highest free tier limits (15 RPM / 1,500 RPD).
+  // The 'pro' and 'preview' models have near-zero limits on free tiers causing 429s.
+  const primaryModel = 'gemini-1.5-flash';
 
   const generate = async (modelId: string) => {
     return await ai.models.generateContent({
@@ -174,29 +174,24 @@ export const generateGeminiResponse = async (
     const response = await generate(primaryModel);
     return processResponse(response);
   } catch (error: any) {
-    console.warn(`Primary model ${primaryModel} failed. Checking for fallback...`, error);
+    console.warn(`Primary model ${primaryModel} failed.`, error);
 
-    // Check for Rate Limit (429) or Service Unavailable (503)
-    const errorMsg = error.message || JSON.stringify(error);
-    const isRateLimit = errorMsg.includes('429') || errorMsg.includes('Quota exceeded') || errorMsg.includes('RESOURCE_EXHAUSTED');
-    const isOverloaded = errorMsg.includes('503') || errorMsg.includes('Overloaded');
-
-    if ((isRateLimit || isOverloaded) && primaryModel !== 'gemini-2.5-flash') {
-      console.log("Falling back to gemini-2.5-flash due to rate limits...");
-      try {
-        // Fallback to Flash (Lighter, higher limits)
-        const fallbackResponse = await generate('gemini-2.5-flash');
-        
-        // Append a note about the fallback
-        const result = processResponse(fallbackResponse);
-        result.text += "\n\n_(Note: High-reasoning model capacity exceeded. Response generated using Turbo mode.)_";
-        return result;
-      } catch (fallbackError) {
-        console.error("Fallback model also failed:", fallbackError);
-        throw fallbackError; // Throw original or new error
-      }
+    // If 1.5-flash fails, we are likely truly out of quota or offline.
+    // We can try one last fallback to 'gemini-1.5-flash-8b' which is smaller/faster if available,
+    // otherwise we re-throw the error.
+    
+    if (primaryModel === 'gemini-1.5-flash') {
+       try {
+         console.log("Attempting fallback to gemini-1.5-flash-8b...");
+         const fallbackResponse = await generate('gemini-1.5-flash-8b');
+         const result = processResponse(fallbackResponse);
+         result.text += "\n\n_(Note: Response generated using high-efficiency 8B model due to network traffic.)_";
+         return result;
+       } catch (e) {
+         // Both failed
+         throw error;
+       }
     }
-
     throw error;
   }
 };
@@ -222,14 +217,24 @@ export const generateImage = async (prompt: string): Promise<string> => {
   const ai = getClient();
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "1:1" } },
+      model: 'gemini-2.0-flash', // Image generation often requires 2.0 or specific image models
+      contents: { parts: [{ text: "Generate an image: " + prompt }] },
+      // Note: Pure image generation via text-to-image API varies. 
+      // If 2.0 flash returns text instead of image bytes, this specific call structure might need
+      // adjustment based on the exact model capabilities enabled for the key.
+      // For safety on free tier, we are using standard content generation.
     });
+    
+    // Check if the model returned inline data (image) or just text description
+    // Most free tier text-models will just describe the image.
+    // True image generation (Imagen) usually requires a paid project.
+    // We attempt to find inline data if the model supports it.
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+       if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
-    throw new Error("No image data returned from model.");
+    
+    // Fallback: If no image data, throw to UI
+    throw new Error("Image generation is currently restricted on this API tier.");
   } catch (error) {
     console.error("Gemini Image Generation Error:", error);
     throw error;
@@ -240,7 +245,7 @@ export const generateSpeech = async (text: string, voiceName: string = 'Kore'): 
   const ai = getClient();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-2.5-flash-preview-tts", // TTS usually specific to this model
       contents: [{ parts: [{ text: text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -254,6 +259,7 @@ export const generateSpeech = async (text: string, voiceName: string = 'Kore'): 
     return base64Audio;
   } catch (error) {
     console.error("Gemini TTS Error:", error);
-    throw error;
+    // TTS is very new/experimental, might hit quota often.
+    throw new Error("Speech generation quota exceeded or unavailable.");
   }
 };

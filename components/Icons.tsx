@@ -75,8 +75,20 @@ export const IconGlobe = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
 );
 
+// New Network Globe Icon for Website
+export const IconNetworkGlobe = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    <path d="M2 12h20" />
+  </svg>
+);
+
+// Updated Discord Icon (Official Brand Logo Path)
 export const IconDiscord = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M7.5 7.5c3.5-1 5.5-1 9 0 1.5-2 3-4 3-4s-1.8-2-3-2c-1.3 0-2.3 2-2.3 2s-1-.3-2-.3-2 .3-2 .3-1-2-2.3-2c-1.2 0-3 2-3 2s1.5 2 3 4"/><path d="M15 15.5c-3.5 1-5.5 1-9 0-1.5 2-3 4-3 4s1.8 2 3 2c1.3 0 2.3-2 2.3-2s1 .3 2 .3 2-.3 2-.3 1 2 2.3 2c1.2 0 3-2 3-2s-1.5-2-3-4"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+     <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1569 2.419zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419z" />
+  </svg>
 );
 
 export const IconInstagram = ({ className }: { className?: string }) => (
@@ -122,5 +134,12 @@ export const IconAmongUs = ({ className }: { className?: string }) => (
     <path fill="currentColor" d="M7 3C5.5 3 4 4 4 6v10c0 2 0 3 2 3h1v2.5c0 1.5.5 2.5 2 2.5s2-1 2-2.5V19h2v2.5c0 1.5.5 2.5 2 2.5s2-1 2-2.5V17c1.5 0 3-1.5 3-3V8c0-2-1.5-5-5-5H7Z" />
     <path fill="#93c5fd" d="M14 6h-3c-1.5 0-2.5.5-2.5 2s1 2.5 2.5 2.5h3c1.5 0 2.5-.5 2.5-2s-1-2-2.5-2Z" />
     <path fill="currentColor" d="M18.5 7h-2.5v9h2.5c1.5 0 2-1 2-2.5v-4c0-1.5-.5-2.5-2-2.5Z" />
+  </svg>
+);
+
+export const IconFluid = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" strokeOpacity="0.5"/>
+    <path d="M8 12C8 12 10 14 12 14C14 14 16 12 16 12" strokeLinecap="round"/>
   </svg>
 );
