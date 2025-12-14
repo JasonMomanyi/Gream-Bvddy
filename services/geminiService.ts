@@ -6,6 +6,16 @@ interface GenerationResult {
   sources: GroundingSource[];
 }
 
+// --- HELPER: Validate API Key ---
+// This ensures we catch Vercel deployment issues where the key might be undefined.
+const getClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined") {
+    throw new Error("CRITICAL: API Key is missing. If you are on Vercel, go to Settings > Environment Variables, add 'API_KEY', and REDEPLOY.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 // Helper to get persona-specific instructions
 const getPersonaInstruction = (persona: AIPersona): string => {
   switch (persona) {
@@ -123,8 +133,9 @@ export const generateGeminiResponse = async (
   history: { role: string; content: string }[],
   persona: AIPersona = 'default'
 ): Promise<GenerationResult> => {
-  // Initialize GoogleGenAI with the API key directly from process.env as per guidelines
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  // Use helper to validate key before making request
+  const ai = getClient();
   
   // Configure tools based on mode. Hallucin might not need search, but others do.
   const tools = [];
@@ -197,7 +208,7 @@ export const generateGeminiResponse = async (
  * Generates an image based on the prompt using Gemini Nano Banana (gemini-2.5-flash-image)
  */
 export const generateImage = async (prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getClient();
   
   try {
     const response = await ai.models.generateContent({
@@ -233,7 +244,7 @@ export const generateImage = async (prompt: string): Promise<string> => {
  * Proxies for "11Labs" style high-quality generation.
  */
 export const generateSpeech = async (text: string, voiceName: string = 'Kore'): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getClient();
   
   try {
     const response = await ai.models.generateContent({

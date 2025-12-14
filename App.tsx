@@ -152,12 +152,15 @@ export default function App() {
         persona: persona,
         sources: result.sources
       }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      // Display the actual error message from the service
+      const errorMessage = error instanceof Error ? error.message : "Unknown connection error.";
+      
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'model',
-        content: "I encountered an error connecting to the intelligence network. Please check your API Key.",
+        content: `⚠️ **System Error**\n\n${errorMessage}\n\n*If on Vercel: Ensure API_KEY is set in Environment Variables and you have Redeployed.*`,
         timestamp: Date.now()
       }]);
     } finally {
